@@ -673,10 +673,7 @@ async function saveCredential(): Promise<ICredentialsResponse | null> {
 		data: data as unknown as ICredentialDataDecryptedObject,
 	};
 
-	if (
-		settingsStore.isEnterpriseFeatureEnabled[EnterpriseEditionFeature.Sharing] &&
-		credentialData.value.sharedWithProjects
-	) {
+	if (credentialData.value.sharedWithProjects) {
 		credentialDetails.sharedWithProjects = credentialData.value
 			.sharedWithProjects as ProjectSharingData[];
 	}
@@ -692,10 +689,8 @@ async function saveCredential(): Promise<ICredentialsResponse | null> {
 	if (isNewCredential) {
 		credential = await createCredential(credentialDetails, projectsStore.currentProject);
 	} else {
-		if (settingsStore.isEnterpriseFeatureEnabled[EnterpriseEditionFeature.Sharing]) {
-			credentialDetails.sharedWithProjects = credentialData.value
-				.sharedWithProjects as ProjectSharingData[];
-		}
+		credentialDetails.sharedWithProjects = credentialData.value
+			.sharedWithProjects as ProjectSharingData[];
 
 		credential = await updateCredential(credentialDetails);
 	}

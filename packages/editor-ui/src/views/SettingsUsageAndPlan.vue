@@ -47,11 +47,8 @@ const badgedPlanName = computed(() => {
 	};
 });
 
-const isCommunity = computed(() => usageStore.planName.toLowerCase() === 'community');
-
-const isCommunityEditionRegistered = computed(
-	() => usageStore.planName.toLowerCase() === 'registered community',
-);
+const isCommunity = computed(() => false); // Never show as community
+const isCommunityEditionRegistered = computed(() => false); // Never show as registered community
 
 const canUserRegisterCommunityPlus = computed(
 	() => getResourcePermissions(usersStore.currentUser?.globalScopes).community.register,
@@ -200,12 +197,6 @@ const openCommunityRegisterModal = () => {
 					{{ locale.baseText('settings.usageAndPlan.activeWorkflows') }}
 				</n8n-text>
 				<div :class="$style.chart">
-					<span v-if="usageStore.activeWorkflowTriggersLimit > 0" :class="$style.chartLine">
-						<span
-							:class="$style.chartBar"
-							:style="{ width: `${usageStore.executionPercentage}%` }"
-						></span>
-					</span>
 					<i18n-t
 						tag="span"
 						:class="$style.count"
@@ -213,64 +204,11 @@ const openCommunityRegisterModal = () => {
 					>
 						<template #count>{{ usageStore.activeWorkflowTriggersCount }}</template>
 						<template #limit>
-							<span v-if="usageStore.activeWorkflowTriggersLimit < 0">{{
-								locale.baseText('settings.usageAndPlan.activeWorkflows.unlimited')
-							}}</span>
-							<span v-else>{{ usageStore.activeWorkflowTriggersLimit }}</span>
+							<span>{{ locale.baseText('settings.usageAndPlan.activeWorkflows.unlimited') }}</span>
 						</template>
 					</i18n-t>
 				</div>
 			</div>
-
-			<N8nInfoTip>{{ locale.baseText('settings.usageAndPlan.activeWorkflows.hint') }}</N8nInfoTip>
-
-			<div :class="$style.buttons">
-				<n8n-button
-					v-if="canUserActivateLicense"
-					:class="$style.buttonTertiary"
-					type="tertiary"
-					size="large"
-					@click="onAddActivationKey"
-				>
-					<span>{{ locale.baseText('settings.usageAndPlan.button.activation') }}</span>
-				</n8n-button>
-				<n8n-button v-if="usageStore.managementToken" size="large" @click="onManagePlan">
-					<a :href="managePlanUrl" target="_blank">{{
-						locale.baseText('settings.usageAndPlan.button.manage')
-					}}</a>
-				</n8n-button>
-				<n8n-button v-else size="large" @click.prevent="onViewPlans">
-					<a :href="viewPlansUrl" target="_blank">{{
-						locale.baseText('settings.usageAndPlan.button.plans')
-					}}</a>
-				</n8n-button>
-			</div>
-
-			<el-dialog
-				v-model="activationKeyModal"
-				width="480px"
-				top="0"
-				:title="locale.baseText('settings.usageAndPlan.dialog.activation.title')"
-				:modal-class="$style.center"
-				@closed="onDialogClosed"
-				@opened="onDialogOpened"
-			>
-				<template #default>
-					<n8n-input
-						ref="activationKeyInput"
-						v-model="activationKey"
-						:placeholder="locale.baseText('settings.usageAndPlan.dialog.activation.label')"
-					/>
-				</template>
-				<template #footer>
-					<n8n-button type="secondary" @click="activationKeyModal = false">
-						{{ locale.baseText('settings.usageAndPlan.dialog.activation.cancel') }}
-					</n8n-button>
-					<n8n-button @click="onLicenseActivation">
-						{{ locale.baseText('settings.usageAndPlan.dialog.activation.activate') }}
-					</n8n-button>
-				</template>
-			</el-dialog>
 		</div>
 	</div>
 </template>

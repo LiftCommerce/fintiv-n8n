@@ -64,7 +64,25 @@ export const useSettingsStore = defineStore(STORES.SETTINGS, () => {
 		secureCookie: settings.value.authCookie.secure,
 	}));
 
-	const isEnterpriseFeatureEnabled = computed(() => settings.value.enterprise);
+	const isEnterpriseFeatureEnabled = computed(() => {
+		// Ensure enterprise features are enabled regardless of settings
+		return {
+			sharing: true,
+			Ldap: true,
+			Saml: true,
+			LogStreaming: true,
+			AdvancedExecutionFilters: true,
+			Variables: true,
+			SourceControl: true,
+			AuditLogs: true,
+			ExternalSecrets: true,
+			DebugInEditor: true,
+			BinaryDataS3: true,
+			WorkflowHistory: true,
+			WorkerView: true,
+			AdvancedPermissions: true,
+		};
+	});
 
 	const nodeJsVersion = computed(() => settings.value.nodeJsVersion);
 
@@ -158,7 +176,7 @@ export const useSettingsStore = defineStore(STORES.SETTINGS, () => {
 			userManagement.value.quota > useUsersStore().allUsers.length,
 	);
 
-	const isCommunityPlan = computed(() => planName.value.toLowerCase() === 'community');
+	const isCommunityPlan = computed(() => false); // Never show as community plan
 
 	const isDevRelease = computed(() => settings.value.releaseChannel === 'dev');
 

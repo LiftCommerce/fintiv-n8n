@@ -31,10 +31,8 @@ const executionHelpers = useExecutionHelpers();
 const workflowsStore = useWorkflowsStore();
 const settingsStore = useSettingsStore();
 
-const isAdvancedExecutionFilterEnabled = computed(
-	() => settingsStore.isEnterpriseFeatureEnabled[EnterpriseEditionFeature.AdvancedExecutionFilters],
-);
-const isAnnotationEnabled = computed(() => isAdvancedExecutionFilterEnabled.value);
+const isAdvancedExecutionFilterEnabled = computed(() => true);
+const isAnnotationEnabled = computed(() => true);
 
 const currentWorkflow = computed(() => (route.params.name as string) || workflowsStore.workflowId);
 const retryExecutionActions = computed(() => [

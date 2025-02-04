@@ -13,7 +13,7 @@ export type UsageTelemetry = {
 	quota: number;
 };
 
-const DEFAULT_PLAN_NAME = 'Community';
+const DEFAULT_PLAN_NAME = 'Enterprise';
 const DEFAULT_STATE: UsageState = {
 	loading: true,
 	data: {
@@ -37,7 +37,7 @@ export const useUsageStore = defineStore('usage', () => {
 
 	const state = reactive<UsageState>({ ...DEFAULT_STATE });
 
-	const planName = computed(() => state.data.license.planName || DEFAULT_PLAN_NAME);
+	const planName = computed(() => 'Enterprise'); // Always return Enterprise
 	const planId = computed(() => state.data.license.planId);
 	const activeWorkflowTriggersLimit = computed(() => state.data.usage.activeWorkflowTriggers.limit);
 	const activeWorkflowTriggersCount = computed(() => state.data.usage.activeWorkflowTriggers.value);

@@ -347,17 +347,15 @@ watch(showOAuthSuccessBanner, (newValue, oldValue) => {
 					:redact-value="true"
 				/>
 			</template>
-			<EnterpriseEdition v-else :features="[EnterpriseEditionFeature.Sharing]">
-				<div>
-					<n8n-info-tip :bold="false">
-						{{
-							i18n.baseText('credentialEdit.credentialEdit.info.sharee', {
-								interpolate: { credentialOwnerName },
-							})
-						}}
-					</n8n-info-tip>
-				</div>
-			</EnterpriseEdition>
+			<div v-else>
+				<n8n-info-tip :bold="false">
+					{{
+						i18n.baseText('credentialEdit.credentialEdit.info.sharee', {
+							interpolate: { credentialOwnerName },
+						})
+					}}
+				</n8n-info-tip>
+			</div>
 
 			<CredentialInputs
 				v-if="credentialType && credentialPermissions.update"
@@ -383,17 +381,6 @@ watch(showOAuthSuccessBanner, (newValue, oldValue) => {
 			<n8n-text v-if="isMissingCredentials" color="text-base" size="medium">
 				{{ i18n.baseText('credentialEdit.credentialConfig.missingCredentialType') }}
 			</n8n-text>
-
-			<EnterpriseEdition :features="[EnterpriseEditionFeature.ExternalSecrets]">
-				<template #fallback>
-					<n8n-info-tip class="mt-s">
-						{{ i18n.baseText('credentialEdit.credentialConfig.externalSecrets') }}
-						<n8n-link bold :to="i18n.baseText('settings.externalSecrets.docs')" size="small">
-							{{ i18n.baseText('credentialEdit.credentialConfig.externalSecrets.moreInfo') }}
-						</n8n-link>
-					</n8n-info-tip>
-				</template>
-			</EnterpriseEdition>
 		</div>
 		<CredentialDocs
 			v-if="showCredentialDocs"

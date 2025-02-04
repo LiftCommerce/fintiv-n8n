@@ -43,9 +43,7 @@ const debouncedEmit = debounce(emit, {
 });
 
 const isCustomDataFilterTracked = ref(false);
-const isAdvancedExecutionFilterEnabled = computed(
-	() => settingsStore.isEnterpriseFeatureEnabled[EnterpriseEditionFeature.AdvancedExecutionFilters],
-);
+const isAdvancedExecutionFilterEnabled = computed(() => true);
 const isAnnotationFiltersEnabled = computed(() => isAdvancedExecutionFilterEnabled.value);
 const showTags = computed(() => false);
 
@@ -298,54 +296,29 @@ onBeforeMount(() => {
 					<label for="execution-filter-saved-data-key">{{
 						locale.baseText('executionsFilter.savedDataKey')
 					}}</label>
-					<n8n-tooltip :disabled="isAdvancedExecutionFilterEnabled" placement="top">
-						<template #content>
-							<i18n-t tag="span" keypath="executionsFilter.customData.inputTooltip">
-								<template #link>
-									<a
-										href="#"
-										data-test-id="executions-filter-view-plans-link"
-										@click.prevent="goToUpgrade"
-										>{{ locale.baseText('executionsFilter.customData.inputTooltip.link') }}</a
-									>
-								</template>
-							</i18n-t>
-						</template>
-						<n8n-input
-							id="execution-filter-saved-data-key"
-							name="execution-filter-saved-data-key"
-							type="text"
-							:disabled="!isAdvancedExecutionFilterEnabled"
-							:placeholder="locale.baseText('executionsFilter.savedDataKeyPlaceholder')"
-							:model-value="filter.metadata[0]?.key"
-							data-test-id="execution-filter-saved-data-key-input"
-							@update:model-value="onFilterMetaChange(0, 'key', $event)"
-						/>
-					</n8n-tooltip>
+					<n8n-input
+						id="execution-filter-saved-data-key"
+						name="execution-filter-saved-data-key"
+						type="text"
+						:disabled="!isAdvancedExecutionFilterEnabled"
+						:placeholder="locale.baseText('executionsFilter.savedDataKeyPlaceholder')"
+						:model-value="filter.metadata[0]?.key"
+						data-test-id="execution-filter-saved-data-key-input"
+						@update:model-value="onFilterMetaChange(0, 'key', $event)"
+					/>
 					<label for="execution-filter-saved-data-value">{{
 						locale.baseText('executionsFilter.savedDataValue')
 					}}</label>
-					<n8n-tooltip :disabled="isAdvancedExecutionFilterEnabled" placement="top">
-						<template #content>
-							<i18n-t tag="span" keypath="executionsFilter.customData.inputTooltip">
-								<template #link>
-									<a href="#" @click.prevent="goToUpgrade">{{
-										locale.baseText('executionsFilter.customData.inputTooltip.link')
-									}}</a>
-								</template>
-							</i18n-t>
-						</template>
-						<n8n-input
-							id="execution-filter-saved-data-value"
-							name="execution-filter-saved-data-value"
-							type="text"
-							:disabled="!isAdvancedExecutionFilterEnabled"
-							:placeholder="locale.baseText('executionsFilter.savedDataValuePlaceholder')"
-							:model-value="filter.metadata[0]?.value"
-							data-test-id="execution-filter-saved-data-value-input"
-							@update:model-value="onFilterMetaChange(0, 'value', $event)"
-						/>
-					</n8n-tooltip>
+					<n8n-input
+						id="execution-filter-saved-data-value"
+						name="execution-filter-saved-data-value"
+						type="text"
+						:disabled="!isAdvancedExecutionFilterEnabled"
+						:placeholder="locale.baseText('executionsFilter.savedDataValuePlaceholder')"
+						:model-value="filter.metadata[0]?.value"
+						data-test-id="execution-filter-saved-data-value-input"
+						@update:model-value="onFilterMetaChange(0, 'value', $event)"
+					/>
 				</div>
 			</div>
 			<n8n-button

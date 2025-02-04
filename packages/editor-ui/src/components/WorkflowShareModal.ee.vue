@@ -63,9 +63,7 @@ const sharedWithProjects = ref([
 ] as ProjectSharingData[]);
 const teamProject = ref(null as Project | null);
 
-const isSharingEnabled = computed(
-	() => settingsStore.isEnterpriseFeatureEnabled[EnterpriseEditionFeature.Sharing],
-);
+const isSharingEnabled = computed(() => true);
 
 const isHomeTeamProject = computed(() => workflow.value.homeProject?.type === ProjectTypes.Team);
 
@@ -235,16 +233,7 @@ watch(
 		:before-close="onCloseModal"
 	>
 		<template #content>
-			<div v-if="!isSharingEnabled" :class="$style.container">
-				<n8n-text>
-					{{
-						i18n.baseText(
-							uiStore.contextBasedTranslationKeys.workflows.sharing.unavailable.description.modal,
-						)
-					}}
-				</n8n-text>
-			</div>
-			<div v-else :class="$style.container">
+			<div :class="$style.container">
 				<n8n-info-tip
 					v-if="!workflowPermissions.share && !isHomeTeamProject"
 					:bold="false"
@@ -256,69 +245,43 @@ watch(
 						})
 					}}
 				</n8n-info-tip>
-				<enterprise-edition :features="[EnterpriseEditionFeature.Sharing]" :class="$style.content">
-					<div>
-						<ProjectSharing
-							v-model="sharedWithProjects"
-							:home-project="workflow.homeProject"
-							:projects="projects"
-							:roles="workflowRoles"
-							:readonly="!workflowPermissions.share"
-							:static="isHomeTeamProject || !workflowPermissions.share"
-							:placeholder="i18n.baseText('workflows.shareModal.select.placeholder')"
-							@project-added="onProjectAdded"
-							@project-removed="onProjectRemoved"
-						/>
-						<n8n-info-tip v-if="isHomeTeamProject" :bold="false" class="mt-s">
-							<i18n-t keypath="workflows.shareModal.info.members" tag="span">
-								<template #projectName>
-									{{ workflow.homeProject?.name }}
-								</template>
-								<template #members>
-									<strong>
-										{{
-											i18n.baseText('workflows.shareModal.info.members.number', {
-												interpolate: {
-													number: String(numberOfMembersInHomeTeamProject),
-												},
-												adjustToNumber: numberOfMembersInHomeTeamProject,
-											})
-										}}
-									</strong>
-								</template>
-							</i18n-t>
-						</n8n-info-tip>
-					</div>
-					<template #fallback>
-						<n8n-text>
-							<i18n-t
-								:keypath="
-									uiStore.contextBasedTranslationKeys.workflows.sharing.unavailable.description
-										.tooltip
-								"
-								tag="span"
-							>
-								<template #action />
-							</i18n-t>
-						</n8n-text>
-					</template>
-				</enterprise-edition>
+				<div :class="$style.content">
+					<ProjectSharing
+						v-model="sharedWithProjects"
+						:home-project="workflow.homeProject"
+						:projects="projects"
+						:roles="workflowRoles"
+						:readonly="!workflowPermissions.share"
+						:static="isHomeTeamProject || !workflowPermissions.share"
+						:placeholder="i18n.baseText('workflows.shareModal.select.placeholder')"
+						@project-added="onProjectAdded"
+						@project-removed="onProjectRemoved"
+					/>
+					<n8n-info-tip v-if="isHomeTeamProject" :bold="false" class="mt-s">
+						<i18n-t keypath="workflows.shareModal.info.members" tag="span">
+							<template #projectName>
+								{{ workflow.homeProject?.name }}
+							</template>
+							<template #members>
+								<strong>
+									{{
+										i18n.baseText('workflows.shareModal.info.members.number', {
+											interpolate: {
+												number: String(numberOfMembersInHomeTeamProject),
+											},
+											adjustToNumber: numberOfMembersInHomeTeamProject,
+										})
+									}}
+								</strong>
+							</template>
+						</i18n-t>
+					</n8n-info-tip>
+				</div>
 			</div>
 		</template>
 
 		<template #footer>
-			<div v-if="!isSharingEnabled" :class="$style.actionButtons">
-				<n8n-button @click="goToUpgrade">
-					{{
-						i18n.baseText(uiStore.contextBasedTranslationKeys.workflows.sharing.unavailable.button)
-					}}
-				</n8n-button>
-			</div>
-			<enterprise-edition
-				v-else
-				:features="[EnterpriseEditionFeature.Sharing]"
-				:class="$style.actionButtons"
-			>
+			<div :class="$style.actionButtons">
 				<n8n-text v-show="isDirty" color="text-light" size="small" class="mr-xs">
 					{{ i18n.baseText('workflows.shareModal.changesHint') }}
 				</n8n-text>
@@ -335,7 +298,7 @@ watch(
 				>
 					{{ i18n.baseText('workflows.shareModal.save') }}
 				</n8n-button>
-			</enterprise-edition>
+			</div>
 		</template>
 	</Modal>
 </template>

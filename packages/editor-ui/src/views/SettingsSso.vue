@@ -147,9 +147,7 @@ const isToggleSsoDisabled = computed(() => {
 
 onMounted(async () => {
 	documentTitle.set(i18n.baseText('settings.sso.title'));
-	if (!ssoStore.isEnterpriseSamlEnabled) {
-		return;
-	}
+	// Always proceed with initialization since SAML is enabled
 	try {
 		await getSamlConfig();
 	} catch (error) {
@@ -163,10 +161,7 @@ onMounted(async () => {
 		<n8n-heading size="2xlarge">{{ i18n.baseText('settings.sso.title') }}</n8n-heading>
 		<div :class="$style.top">
 			<n8n-heading size="xlarge">{{ i18n.baseText('settings.sso.subtitle') }}</n8n-heading>
-			<n8n-tooltip
-				v-if="ssoStore.isEnterpriseSamlEnabled"
-				:disabled="ssoStore.isSamlLoginEnabled || ssoSettingsSaved"
-			>
+			<n8n-tooltip :disabled="ssoStore.isSamlLoginEnabled || ssoSettingsSaved">
 				<template #content>
 					<span>
 						{{ i18n.baseText('settings.sso.activation.tooltip') }}
@@ -187,7 +182,7 @@ onMounted(async () => {
 				{{ i18n.baseText('settings.sso.info.link') }}
 			</a>
 		</n8n-info-tip>
-		<div v-if="ssoStore.isEnterpriseSamlEnabled" data-test-id="sso-content-licensed">
+		<div data-test-id="sso-content-licensed">
 			<div :class="$style.group">
 				<label>{{ i18n.baseText('settings.sso.settings.redirectUrl.label') }}</label>
 				<CopyInput
@@ -251,18 +246,6 @@ onMounted(async () => {
 				{{ i18n.baseText('settings.sso.settings.footer.hint') }}
 			</footer>
 		</div>
-		<n8n-action-box
-			v-else
-			data-test-id="sso-content-unlicensed"
-			:class="$style.actionBox"
-			:description="i18n.baseText('settings.sso.actionBox.description')"
-			:button-text="i18n.baseText('settings.sso.actionBox.buttonText')"
-			@click:button="goToUpgrade"
-		>
-			<template #heading>
-				<span>{{ i18n.baseText('settings.sso.actionBox.title') }}</span>
-			</template>
-		</n8n-action-box>
 	</div>
 </template>
 

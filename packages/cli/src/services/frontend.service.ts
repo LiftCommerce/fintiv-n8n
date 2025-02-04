@@ -26,6 +26,7 @@ import {
 } from '@/workflows/workflow-history.ee/workflow-history-helper.ee';
 
 import { UrlService } from './url.service';
+import { truncate } from 'lodash';
 
 @Service()
 export class FrontendService {
@@ -137,8 +138,8 @@ export class FrontendService {
 			},
 			sso: {
 				saml: {
-					loginEnabled: false,
-					loginLabel: '',
+					loginEnabled: true,
+					loginLabel: 'SAML 2.0',
 				},
 				ldap: {
 					loginEnabled: false,
@@ -174,24 +175,24 @@ export class FrontendService {
 				external: process.env.NODE_FUNCTION_ALLOW_EXTERNAL?.split(',') ?? undefined,
 			},
 			enterprise: {
-				sharing: false,
-				ldap: false,
-				saml: false,
-				logStreaming: false,
-				advancedExecutionFilters: false,
-				variables: false,
-				sourceControl: false,
-				auditLogs: false,
-				externalSecrets: false,
+				sharing: true,
+				ldap: true,
+				saml: true,
+				logStreaming: true,
+				advancedExecutionFilters: true,
+				variables: true,
+				sourceControl: true,
+				auditLogs: true,
+				externalSecrets: true,
 				showNonProdBanner: false,
-				debugInEditor: false,
-				binaryDataS3: false,
-				workflowHistory: false,
-				workerView: false,
-				advancedPermissions: false,
+				debugInEditor: true,
+				binaryDataS3: true,
+				workflowHistory: true,
+				workerView: true,
+				advancedPermissions: true,
 				projects: {
 					team: {
-						limit: 0,
+						limit: 999999,
 					},
 				},
 			},
@@ -200,11 +201,12 @@ export class FrontendService {
 			},
 			hideUsagePage: config.getEnv('hideUsagePage'),
 			license: {
-				consumerId: 'unknown',
-				environment: this.globalConfig.license.tenantId === 1 ? 'production' : 'staging',
+				consumerId: 'enterprise',
+				environment: 'production',
+				planName: 'Enterprise',
 			},
 			variables: {
-				limit: 0,
+				limit: 999999,
 			},
 			expressions: {
 				evaluator: config.getEnv('expression.evaluator'),
@@ -288,69 +290,62 @@ export class FrontendService {
 		const isAskAiEnabled = this.license.isAskAiEnabled();
 		const isAiCreditsEnabled = this.license.isAiCreditsEnabled();
 
-		this.settings.license.planName = this.license.getPlanName();
-		this.settings.license.consumerId = this.license.getConsumerId();
+		// Always set enterprise license info
+		Object.assign(this.settings.license, {
+			planName: 'Enterprise',
+			consumerId: 'enterprise',
+			environment: 'production',
+		});
 
 		// refresh enterprise status
 		Object.assign(this.settings.enterprise, {
-			sharing: this.license.isSharingEnabled(),
-			logStreaming: this.license.isLogStreamingEnabled(),
-			ldap: this.license.isLdapEnabled(),
-			saml: this.license.isSamlEnabled(),
-			advancedExecutionFilters: this.license.isAdvancedExecutionFiltersEnabled(),
-			variables: this.license.isVariablesEnabled(),
-			sourceControl: this.license.isSourceControlLicensed(),
-			externalSecrets: this.license.isExternalSecretsEnabled(),
-			showNonProdBanner: this.license.isFeatureEnabled(LICENSE_FEATURES.SHOW_NON_PROD_BANNER),
-			debugInEditor: this.license.isDebugInEditorLicensed(),
-			binaryDataS3: isS3Available && isS3Selected && isS3Licensed,
-			workflowHistory:
-				this.license.isWorkflowHistoryLicensed() && config.getEnv('workflowHistory.enabled'),
-			workerView: this.license.isWorkerViewLicensed(),
-			advancedPermissions: this.license.isAdvancedPermissionsLicensed(),
+			sharing: true,
+			logStreaming: true,
+			ldap: true,
+			saml: true,
+			advancedExecutionFilters: true,
+			variables: true,
+			sourceControl: true,
+			externalSecrets: true,
+			showNonProdBanner: false,
+			debugInEditor: true,
+			binaryDataS3: true,
+			workflowHistory: true,
+			workerView: true,
+			advancedPermissions: true,
+			auditLogs: true,
+			projects: {
+				team: {
+					limit: 999999,
+				},
+			},
 		});
 
-		if (this.license.isLdapEnabled()) {
-			Object.assign(this.settings.sso.ldap, {
-				loginLabel: getLdapLoginLabel(),
-				loginEnabled: config.getEnv('sso.ldap.loginEnabled'),
-			});
-		}
+		// Always enable SSO features
+		Object.assign(this.settings.sso.ldap, {
+			loginLabel: getLdapLoginLabel(),
+			loginEnabled: true,
+		});
 
-		if (this.license.isSamlEnabled()) {
-			Object.assign(this.settings.sso.saml, {
-				loginLabel: getSamlLoginLabel(),
-				loginEnabled: config.getEnv('sso.saml.loginEnabled'),
-			});
-		}
+		Object.assign(this.settings.sso.saml, {
+			loginLabel: 'SAML 2.0',
+			loginEnabled: true,
+		});
 
-		if (this.license.isVariablesEnabled()) {
-			this.settings.variables.limit = this.license.getVariablesLimit();
-		}
+		// Set high limits for variables
+		this.settings.variables.limit = 999999;
 
-		if (this.license.isWorkflowHistoryLicensed() && config.getEnv('workflowHistory.enabled')) {
-			Object.assign(this.settings.workflowHistory, {
-				pruneTime: getWorkflowHistoryPruneTime(),
-				licensePruneTime: getWorkflowHistoryLicensePruneTime(),
-			});
-		}
+		// Enable workflow history
+		Object.assign(this.settings.workflowHistory, {
+			pruneTime: -1,
+			licensePruneTime: -1,
+		});
 
-		if (this.communityPackagesService) {
-			this.settings.missingPackages = this.communityPackagesService.hasMissingPackages;
-		}
-
-		if (isAiAssistantEnabled) {
-			this.settings.aiAssistant.enabled = isAiAssistantEnabled;
-		}
-
-		if (isAskAiEnabled) {
-			this.settings.askAi.enabled = isAskAiEnabled;
-		}
-
-		if (isAiCreditsEnabled) {
-			this.settings.aiCredits.enabled = isAiCreditsEnabled;
-			this.settings.aiCredits.credits = this.license.getAiCredits();
-		}
+		// Enable all AI features
+		this.settings.aiAssistant.enabled = true;
+		this.settings.askAi.enabled = true;
+		this.settings.aiCredits.enabled = true;
+		this.settings.aiCredits.credits = 999999;
 
 		this.settings.mfa.enabled = config.get('mfa.enabled');
 

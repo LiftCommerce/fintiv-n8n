@@ -60,9 +60,7 @@ const isRetriable = computed(
 	() => !!props.execution && executionHelpers.isExecutionRetriable(props.execution),
 );
 
-const isAnnotationEnabled = computed(
-	() => settingsStore.isEnterpriseFeatureEnabled[EnterpriseEditionFeature.AdvancedExecutionFilters],
-);
+const isAnnotationEnabled = computed(() => true);
 
 const hasAnnotation = computed(
 	() =>

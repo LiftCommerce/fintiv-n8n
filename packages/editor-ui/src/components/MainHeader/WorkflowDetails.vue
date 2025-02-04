@@ -192,9 +192,7 @@ const workflowMenuItems = computed<ActionDropdownItem[]>(() => {
 	return actions;
 });
 
-const isWorkflowHistoryFeatureEnabled = computed(() => {
-	return settingsStore.isEnterpriseFeatureEnabled[EnterpriseEditionFeature.WorkflowHistory];
-});
+const isWorkflowHistoryFeatureEnabled = computed(() => true);
 
 const workflowTagIds = computed(() => {
 	return (props.tags ?? []).map((tag) => (typeof tag === 'string' ? tag : tag.id));
@@ -618,45 +616,16 @@ function showCreateWorkflowSuccessToast(id?: string) {
 					:workflow-permissions="workflowPermissions"
 				/>
 			</span>
-			<EnterpriseEdition :features="[EnterpriseEditionFeature.Sharing]">
-				<div :class="$style.group">
-					<CollaborationPane v-if="!isNewWorkflow" />
-					<N8nButton
-						type="secondary"
-						data-test-id="workflow-share-button"
-						@click="onShareButtonClick"
-					>
-						{{ i18n.baseText('workflowDetails.share') }}
-					</N8nButton>
-				</div>
-				<template #fallback>
-					<N8nTooltip>
-						<N8nButton type="secondary" :class="['mr-2xs', $style.disabledShareButton]">
-							{{ i18n.baseText('workflowDetails.share') }}
-						</N8nButton>
-						<template #content>
-							<i18n-t
-								:keypath="
-									uiStore.contextBasedTranslationKeys.workflows.sharing.unavailable.description
-										.tooltip
-								"
-								tag="span"
-							>
-								<template #action>
-									<a @click="goToUpgrade">
-										{{
-											i18n.baseText(
-												uiStore.contextBasedTranslationKeys.workflows.sharing.unavailable
-													.button as BaseTextKey,
-											)
-										}}
-									</a>
-								</template>
-							</i18n-t>
-						</template>
-					</N8nTooltip>
-				</template>
-			</EnterpriseEdition>
+			<div :class="$style.group">
+				<CollaborationPane v-if="!isNewWorkflow" />
+				<N8nButton
+					type="secondary"
+					data-test-id="workflow-share-button"
+					@click="onShareButtonClick"
+				>
+					{{ i18n.baseText('workflowDetails.share') }}
+				</N8nButton>
+			</div>
 			<div :class="$style.group">
 				<SaveButton
 					type="primary"

@@ -115,7 +115,6 @@ const initialize = async () => {
 
 onMounted(async () => {
 	documentTitle.set(locale.baseText('settings.sourceControl.title'));
-	if (!sourceControlStore.isEnterpriseSourceControlEnabled) return;
 	await initialize();
 });
 
@@ -193,10 +192,7 @@ const onSelectSshKeyType = async (sshKeyType: TupleToUnion<SshKeyTypes>) => {
 		<n8n-heading size="2xlarge" tag="h1">{{
 			locale.baseText('settings.sourceControl.title')
 		}}</n8n-heading>
-		<div
-			v-if="sourceControlStore.isEnterpriseSourceControlEnabled"
-			data-test-id="source-control-content-licensed"
-		>
+		<div data-test-id="source-control-content-licensed">
 			<n8n-callout theme="secondary" icon="info-circle" class="mt-2xl mb-l">
 				<i18n-t keypath="settings.sourceControl.description" tag="span">
 					<template #link>
@@ -360,24 +356,6 @@ const onSelectSshKeyType = async (sshKeyType: TupleToUnion<SshKeyTypes>) => {
 				</div>
 			</div>
 		</div>
-		<n8n-action-box
-			v-else
-			data-test-id="source-control-content-unlicensed"
-			:class="$style.actionBox"
-			:description="locale.baseText('settings.sourceControl.actionBox.description')"
-			:button-text="locale.baseText('settings.sourceControl.actionBox.buttonText')"
-			@click:button="goToUpgrade"
-		>
-			<template #heading>
-				<span>{{ locale.baseText('settings.sourceControl.actionBox.title') }}</span>
-			</template>
-			<template #description>
-				{{ locale.baseText('settings.sourceControl.actionBox.description') }}
-				<a :href="locale.baseText('settings.sourceControl.docs.url')" target="_blank">
-					{{ locale.baseText('settings.sourceControl.actionBox.description.link') }}
-				</a>
-			</template>
-		</n8n-action-box>
 	</div>
 </template>
 
