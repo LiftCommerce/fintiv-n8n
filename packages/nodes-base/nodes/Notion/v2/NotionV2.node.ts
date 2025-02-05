@@ -63,15 +63,22 @@ export class NotionV2 implements INodeType {
 				for (let i = 0; i < itemsLength; i++) {
 					try {
 						const blockId = extractBlockId.call(this, nodeVersion, i);
-						const blockValues = this.getNodeParameter(
-							'blockUi.blockValues',
-							i,
-							[],
-						) as IDataObject[];
-						extractDatabaseMentionRLC(blockValues);
-						const body: IDataObject = {
-							children: formatBlocks(blockValues),
-						};
+						const inputType = this.getNodeParameter('blocksInputType', i);
+						const body: IDataObject = { children: [] };
+
+						if (inputType === 'expression') {
+							const children = this.getNodeParameter('blocksExpression', i, []) as IDataObject[];
+							body.children = children;
+						} else {
+							const blockValues = this.getNodeParameter(
+								'blockUi.blockValues',
+								i,
+								[],
+							) as IDataObject[];
+							extractDatabaseMentionRLC(blockValues);
+							body.children = formatBlocks(blockValues);
+						}
+
 						const block = await notionApiRequest.call(
 							this,
 							'PATCH',
