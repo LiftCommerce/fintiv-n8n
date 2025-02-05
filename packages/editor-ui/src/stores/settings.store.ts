@@ -68,19 +68,19 @@ export const useSettingsStore = defineStore(STORES.SETTINGS, () => {
 		// Ensure enterprise features are enabled regardless of settings
 		return {
 			sharing: true,
-			Ldap: true,
-			Saml: true,
-			LogStreaming: true,
-			AdvancedExecutionFilters: true,
-			Variables: true,
-			SourceControl: true,
-			AuditLogs: true,
-			ExternalSecrets: true,
-			DebugInEditor: true,
-			BinaryDataS3: true,
-			WorkflowHistory: true,
-			WorkerView: true,
-			AdvancedPermissions: true,
+			ldap: true,
+			saml: true,
+			logStreaming: true,
+			advancedExecutionFilters: true,
+			variables: true,
+			sourceControl: true,
+			auditLogs: true,
+			externalSecrets: true,
+			debugInEditor: true,
+			binaryDataS3: true,
+			workflowHistory: true,
+			workerView: true,
+			advancedPermissions: true,
 		};
 	});
 
