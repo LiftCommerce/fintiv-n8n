@@ -237,11 +237,73 @@ export class NotionV1 implements INodeType {
 					const blockId = extractPageId(
 						this.getNodeParameter('blockId', i, '', { extractValue: true }) as string,
 					);
-					const blockValues = this.getNodeParameter('blockUi.blockValues', i, []) as IDataObject[];
-					extractDatabaseMentionRLC(blockValues);
+					const inputType = this.getNodeParameter('blocksInputType', i) as string;
 					const body: IDataObject = {
-						children: formatBlocks(blockValues),
+						children: [],
 					};
+
+					if (inputType === 'expression') {
+						const blocks = this.getNodeParameter('blocksExpression', i) as string;
+						const parsedBlocks = JSON.parse(blocks);
+
+						// Handle both direct block array and wrapped list format
+						let blockArray = parsedBlocks;
+						if (
+							Array.isArray(parsedBlocks) &&
+							parsedBlocks.length === 1 &&
+							parsedBlocks[0].object === 'list'
+						) {
+							blockArray = parsedBlocks[0].results;
+						}
+
+						// Clean the blocks to match Notion API format
+						body.children = blockArray.map((block: IDataObject) => {
+							const blockType = block.type as string;
+							const cleanBlock: IDataObject = {
+								type: blockType,
+								[blockType]: {},
+							};
+
+							// Get the block content
+							const blockContent = block[blockType] as IDataObject;
+							if (blockContent) {
+								const richText = blockContent.rich_text as IDataObject[];
+								if (Array.isArray(richText) && richText.length > 0) {
+									(cleanBlock[blockType] as IDataObject).rich_text = richText;
+								} else {
+									// If no rich_text, create default structure
+									(cleanBlock[blockType] as IDataObject).rich_text = [
+										{
+											type: 'text',
+											text: {
+												content: '',
+											},
+										},
+									];
+								}
+
+								// Copy color if present
+								if (blockContent.color) {
+									(cleanBlock[blockType] as IDataObject).color = blockContent.color;
+								}
+
+								// Handle specific block types
+								if (['heading_1', 'heading_2', 'heading_3'].includes(blockType)) {
+									(cleanBlock[blockType] as IDataObject).is_toggleable = false;
+								}
+							}
+
+							return cleanBlock;
+						});
+					} else {
+						const blockValues = this.getNodeParameter(
+							'blockUi.blockValues',
+							i,
+							[],
+						) as IDataObject[];
+						extractDatabaseMentionRLC(blockValues);
+						body.children = formatBlocks(blockValues);
+					}
 					const block = await notionApiRequest.call(
 						this,
 						'PATCH',
