@@ -1,0 +1,115 @@
+name: Build Service Containers
+
+on:
+  workflow_dispatch:
+  push:
+    tags:
+      - 'v[0-9]+.[0-9]+.[0-9]+-rc'
+      - '*-dev'
+
+jobs:
+  initialize:
+    runs-on: ubuntu-latest
+    outputs:
+      matrix: ${{ steps.set-matrix.outputs.matrix }}
+    steps:
+      - id: set-matrix
+        run: |
+          matrix="{"
+          matrix+="\"include\":[{\"project\":\"n8n-custom\",\"dockerfile\":\"docker/images/n8n-custom/Dockerfile\",\"context\":\".\"}]}"
+          echo "matrix=$matrix" >> $GITHUB_OUTPUT
+          echo "Generated matrix: $matrix"
+
+  build:
+    needs: initialize
+    runs-on: ubuntu-latest
+    permissions:
+      id-token: write
+      contents: read
+    strategy:
+      matrix: ${{ fromJson(needs.initialize.outputs.matrix) }}
+    
+    env:
+      AWS_REGION: us-west-2
+      ECR_REGISTRY: ${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.us-west-2.amazonaws.com
+      ECR_REPOSITORY: ${{ matrix.project }}
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+        with:
+          fetch-depth: 0
+
+      - name: Check for changes
+        id: check-changes
+        run: |
+          LAST_VERSION_TAG=$(git tag | grep -E '^v[0-9]+\.[0-9]+\.[0-9]+$' | sort -rV | head -n1)
+          
+          if [ -z "$LAST_VERSION_TAG" ]; then
+            echo "No version tags found. Will proceed with build."
+            echo "changed=true" >> $GITHUB_OUTPUT
+          else
+            echo "Last version tag: $LAST_VERSION_TAG"
+            CHANGED_FILES=$(git diff --name-only $LAST_VERSION_TAG HEAD)
+            
+            if [ -n "$CHANGED_FILES" ]; then
+              echo "Changes detected in files:"
+              echo "$CHANGED_FILES"
+              echo "changed=true" >> $GITHUB_OUTPUT
+            else
+              echo "No changes since $LAST_VERSION_TAG"
+              echo "changed=false" >> $GITHUB_OUTPUT
+            fi
+          fi
+
+      - name: Configure AWS credentials
+        if: steps.check-changes.outputs.changed == 'true'
+        uses: aws-actions/configure-aws-credentials@v2
+        with:
+          role-to-assume: arn:aws:iam::${{ secrets.AWS_ACCOUNT_ID }}:role/github-actions-ecr
+          aws-region: ${{ env.AWS_REGION }}
+      
+      - name: Login to Amazon ECR
+        if: steps.check-changes.outputs.changed == 'true'
+        id: login-ecr
+        uses: aws-actions/amazon-ecr-login@v1
+      
+      - name: Set up Docker Buildx
+        if: steps.check-changes.outputs.changed == 'true'
+        uses: docker/setup-buildx-action@v2
+
+      - name: Extract metadata for Docker
+        if: steps.check-changes.outputs.changed == 'true'
+        id: meta
+        run: |
+          VERSION=${GITHUB_REF#refs/tags/}
+          echo "VERSION=${VERSION}" >> $GITHUB_OUTPUT
+          echo "tag=${ECR_REGISTRY}/${ECR_REPOSITORY}:${VERSION}" >> $GITHUB_OUTPUT
+          echo "Building version: ${VERSION}"
+          echo "ECR Repository: ${ECR_REPOSITORY}"
+          echo "Full tag: ${ECR_REGISTRY}/${ECR_REPOSITORY}:${VERSION}"
+
+      - name: Build and push Docker image
+        if: steps.check-changes.outputs.changed == 'true'
+        uses: docker/build-push-action@v4
+        with:
+          context: ${{ matrix.context }}
+          file: ${{ matrix.dockerfile }}
+          push: true
+          tags: ${{ steps.meta.outputs.tag }}
+          build-args: |
+            DD_GIT_REPOSITORY_URL=${{ github.server_url }}/${{ github.repository }}
+            DD_GIT_COMMIT_SHA=${{ github.sha }}
+          labels: |
+            org.opencontainers.image.revision=${{ github.sha }}
+            org.opencontainers.image.source=${{ github.repository }}
+            build.date=${{ github.event.repository.updated_at }}
+      
+      - name: Print image details
+        if: steps.check-changes.outputs.changed == 'true'
+        run: |
+          echo "Successfully built and pushed image: ${{ steps.meta.outputs.tag }}"
+          echo "Dockerfile path: ${{ matrix.dockerfile }}"
+          echo "Context path: ${{ matrix.context }}"
+          echo "Commit SHA: ${GITHUB_SHA}"
+          echo "Build timestamp: $(date -u +'%Y-%m-%dT%H:%M:%SZ')"

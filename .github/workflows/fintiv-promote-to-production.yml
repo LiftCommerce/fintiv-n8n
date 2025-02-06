@@ -1,0 +1,204 @@
+name: Promote to Production
+
+on:
+  workflow_dispatch:  # No inputs needed - will use the selected tag
+
+env:
+  AWS_REGION: us-west-2
+  ECR_REGISTRY: ${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.us-west-2.amazonaws.com
+  REPOSITORY: n8n-custom
+  PRODUCTION_KUSTOMIZATION: infrastructure-gitops/kubernetes/overlays/argocd/production/kustomization.yaml
+  PRODUCTION_APP: infrastructure-gitops/argocd/applications/environments/production/fintiv-mono-repo-production.yaml
+  PRODUCTION_BOOTSTRAP: infrastructure-gitops/argocd/bootstrap/production/bootstrap.yaml
+
+permissions:
+  contents: write
+  id-token: write
+  pull-requests: write
+  actions: write
+
+jobs:
+  promote:
+    runs-on: ubuntu-latest
+    environment: production
+    
+    steps:
+      - name: Validate ref type
+        run: |
+          if [ "${{ github.ref_type }}" != "tag" ]; then
+            echo "Error: This workflow can only be triggered by tags, not branches"
+            exit 1
+          fi
+
+      - name: Set release version
+        id: set-version
+        run: |
+          RC_VERSION="${{ github.ref_name }}"
+          RELEASE_VERSION="${RC_VERSION%-rc}"
+          echo "release_version=$RELEASE_VERSION" >> $GITHUB_OUTPUT
+          echo "rc_version=$RC_VERSION" >> $GITHUB_OUTPUT
+
+      - name: Checkout n8n code
+        uses: actions/checkout@v3
+        with:
+          fetch-depth: 0
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Checkout mono-repo
+        uses: actions/checkout@v3
+        with:
+          repository: LiftCommerce/fintiv-mono-repo
+          path: mono-repo
+          token: ${{ secrets.GITHUB_TOKEN }}
+          fetch-depth: 0
+
+      - name: Verify staging branch exists
+        run: |
+          cd mono-repo
+          STAGING_BRANCH="staging-${{ github.ref_name }}"
+          if ! git show-ref --verify --quiet "refs/remotes/origin/$STAGING_BRANCH"; then
+            echo "Error: Required staging branch '$STAGING_BRANCH' does not exist"
+            echo "Please ensure the staging promotion workflow has completed successfully first"
+            exit 1
+          fi
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v2
+        with:
+          role-to-assume: arn:aws:iam::${{ secrets.AWS_ACCOUNT_ID }}:role/github-actions-ecr
+          aws-region: ${{ env.AWS_REGION }}
+      
+      - name: Login to Amazon ECR
+        id: login-ecr
+        uses: aws-actions/amazon-ecr-login@v1
+
+      - name: Create production branch from staging
+        run: |
+          cd mono-repo
+          # Checkout the staging branch as the base
+          git checkout "staging-${{ github.ref_name }}"
+          
+          # Create production branch from staging
+          git checkout -b "production-${{ steps.set-version.outputs.release_version }}"
+          
+          git config --global user.email "github-actions[bot]@users.noreply.github.com"
+          git config --global user.name "github-actions[bot]"
+
+      - name: Tag and Update Images
+        run: |
+          cd mono-repo
+          sed -i "s/\${AWS_ACCOUNT_ID}/${{ secrets.AWS_ACCOUNT_ID }}/g" $PRODUCTION_KUSTOMIZATION
+          
+          # Check if RC image exists
+          RC_IMAGE_EXISTS=$(aws ecr describe-images \
+            --repository-name ${{ env.REPOSITORY }} \
+            --image-ids imageTag=${{ github.ref_name }} \
+            2>/dev/null || echo "false")
+          
+          if [ "$RC_IMAGE_EXISTS" = "false" ]; then
+            echo "Error: RC image ${{ env.REPOSITORY }}:${{ github.ref_name }} not found"
+            exit 1
+          fi
+          
+          # Get RC image manifest
+          MANIFEST=$(aws ecr batch-get-image \
+            --repository-name ${{ env.REPOSITORY }} \
+            --image-ids imageTag=${{ github.ref_name }} \
+            --query 'images[].imageManifest' \
+            --output text)
+          
+          if [ -z "$MANIFEST" ]; then
+            echo "Failed to get manifest for ${{ env.REPOSITORY }}"
+            exit 1
+          fi
+          
+          # Tag RC image with production version
+          aws ecr put-image \
+            --repository-name ${{ env.REPOSITORY }} \
+            --image-tag ${{ steps.set-version.outputs.release_version }} \
+            --image-manifest "$MANIFEST"
+          
+          echo "Tagged ${{ env.REPOSITORY }}:${{ github.ref_name }} as ${{ env.REPOSITORY }}:${{ steps.set-version.outputs.release_version }}"
+          
+          # Update kustomization.yaml
+          yq eval "(.images[] | select(.name == \"${{ env.REPOSITORY }}\")).newTag = \"${{ steps.set-version.outputs.release_version }}\"" -i $PRODUCTION_KUSTOMIZATION
+
+          # Update ArgoCD revisions
+          yq eval '(select(.kind == "Application").spec.source.targetRevision = "${{ steps.set-version.outputs.release_version }}-production") // .' -i $PRODUCTION_APP
+          yq eval '(select(.kind == "Application").spec.source.targetRevision = "${{ steps.set-version.outputs.release_version }}-production") // .' -i $PRODUCTION_BOOTSTRAP
+          
+          # Commit changes if any
+          if git diff --quiet; then
+            echo "No changes to commit"
+            exit 0
+          fi
+          
+          git add $PRODUCTION_KUSTOMIZATION
+          git add $PRODUCTION_APP
+          git add $PRODUCTION_BOOTSTRAP
+          git commit -m "chore: update production deployment to ${{ steps.set-version.outputs.release_version }}"
+          git push -u origin production-${{ steps.set-version.outputs.release_version }}
+
+      - name: Create Release Tag in mono-repo
+        run: |
+          cd mono-repo
+          # Get the commit hash that the RC tag points to
+          RC_COMMIT=$(git rev-list -n 1 "${{ steps.set-version.outputs.rc_version }}")
+          
+          if [ -z "$RC_COMMIT" ]; then
+            echo "Error: Could not find commit for RC tag ${{ steps.set-version.outputs.rc_version }}"
+            exit 1
+          fi
+          
+          echo "Creating release tag ${{ steps.set-version.outputs.release_version }} on commit $RC_COMMIT"
+          
+          # Create the new tag on the same commit as the RC tag
+          git tag -a "${{ steps.set-version.outputs.release_version }}" $RC_COMMIT -m "Release ${{ steps.set-version.outputs.release_version }}"
+          git push origin "${{ steps.set-version.outputs.release_version }}"
+
+      - name: Create Release Tag in n8n repo
+        run: |
+          # Get the commit hash that the RC tag points to
+          RC_COMMIT=$(git rev-list -n 1 "${{ steps.set-version.outputs.rc_version }}")
+          
+          if [ -z "$RC_COMMIT" ]; then
+            echo "Error: Could not find commit for RC tag ${{ steps.set-version.outputs.rc_version }}"
+            exit 1
+          fi
+          
+          echo "Creating release tag ${{ steps.set-version.outputs.release_version }} on commit $RC_COMMIT"
+          
+          # Create the new tag on the same commit as the RC tag
+          git tag -a "${{ steps.set-version.outputs.release_version }}" $RC_COMMIT -m "Release ${{ steps.set-version.outputs.release_version }}"
+          git push origin "${{ steps.set-version.outputs.release_version }}"
+
+      - name: Verify Kustomization Updates
+        run: |
+          cd mono-repo
+          echo "Final kustomization.yaml contents:"
+          cat $PRODUCTION_KUSTOMIZATION
+          
+          INCORRECT_TAGS=$(yq eval '.images[].newTag' $PRODUCTION_KUSTOMIZATION | grep -v "^${{ steps.set-version.outputs.release_version }}$" || true)
+          if [ -n "$INCORRECT_TAGS" ]; then
+            echo "Warning: Some images were not updated:"
+            echo "$INCORRECT_TAGS"
+          else
+            echo "All images successfully updated to version ${{ steps.set-version.outputs.release_version }}"
+          fi
+
+      - name: Create production tag in mono-repo
+        if: success()
+        run: |
+          cd mono-repo
+          NEW_TAG="${{ steps.set-version.outputs.release_version }}-production"
+          git tag $NEW_TAG
+          git push origin $NEW_TAG
+          echo "Created and pushed new tag: $NEW_TAG"
+
+      - name: Create production tag in n8n repo
+        if: success()
+        run: |
+          NEW_TAG="${{ steps.set-version.outputs.release_version }}-production"
+          git tag $NEW_TAG
+          git push origin $NEW_TAG
+          echo "Created and pushed new tag: $NEW_TAG"
