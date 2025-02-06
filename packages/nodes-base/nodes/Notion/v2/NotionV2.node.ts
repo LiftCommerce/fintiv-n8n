@@ -807,6 +807,4 @@ export class NotionV2 implements INodeType {
 
 		return [returnData];
 	}
-
-	private;
 }
