@@ -262,7 +262,7 @@ export const pageFields: INodeProperties[] = [
 		displayOptions: {
 			show: {
 				resource: ['block'],
-				operation: ['append'],
+				operation: ['create'],
 			},
 		},
 	},
@@ -277,7 +277,7 @@ export const pageFields: INodeProperties[] = [
 		displayOptions: {
 			show: {
 				resource: ['block'],
-				operation: ['append'],
+				operation: ['create'],
 				blocksInputType: ['expression'],
 			},
 		},
