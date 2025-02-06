@@ -675,13 +675,21 @@ export class NotionV2 implements INodeType {
 						};
 						body.parent.page_id = getPageId.call(this, i);
 						body.properties = formatTitle(this.getNodeParameter('title', i) as string);
-						const blockValues = this.getNodeParameter(
-							'blockUi.blockValues',
-							i,
-							[],
-						) as IDataObject[];
-						extractDatabaseMentionRLC(blockValues);
-						body.children = formatBlocks(blockValues);
+
+						const inputType = this.getNodeParameter('blocksInputType', i);
+
+						if (inputType === 'expression') {
+							const children = this.getNodeParameter('blocksExpression', i, []) as IDataObject[];
+							body.children = children;
+						} else {
+							const blockValues = this.getNodeParameter(
+								'blockUi.blockValues',
+								i,
+								[],
+							) as IDataObject[];
+							extractDatabaseMentionRLC(blockValues);
+							body.children = formatBlocks(blockValues);
+						}
 
 						const options = this.getNodeParameter('options', i);
 						if (options.icon) {

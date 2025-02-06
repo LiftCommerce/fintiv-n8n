@@ -197,7 +197,7 @@ export const blockFields: INodeProperties[] = [
 				blocksInputType: ['expression'],
 			},
 		},
-		default: '={{ [] }}',
+		default: [],
 		description:
 			'Expression that returns an array of Notion block objects. Must match Notion API block format. For example:\n[{\n  "type": "paragraph",\n  "paragraph": {\n    "rich_text": [{\n      "type": "text",\n      "text": { "content": "Hello world" }\n    }]\n  }\n}]',
 	},

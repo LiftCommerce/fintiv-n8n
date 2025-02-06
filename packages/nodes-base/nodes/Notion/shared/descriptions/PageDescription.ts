@@ -242,7 +242,58 @@ export const pageFields: INodeProperties[] = [
 		default: true,
 		description: 'Whether to return a simplified version of the response instead of the raw data',
 	},
-	...blocks('page', 'create'),
+	{
+		displayName: 'Blocks Input Type',
+		name: 'blocksInputType',
+		type: 'options',
+		options: [
+			{
+				name: 'Manual (UI)',
+				value: 'manual',
+				description: 'Configure blocks manually through the UI',
+			},
+			{
+				name: 'Expression',
+				value: 'expression',
+				description: 'Specify blocks directly using an expression',
+			},
+		],
+		default: 'manual',
+		displayOptions: {
+			show: {
+				resource: ['block'],
+				operation: ['append'],
+			},
+		},
+	},
+	{
+		displayName: 'Blocks (Expression)',
+		name: 'blocksExpression',
+		type: 'json',
+		typeOptions: {
+			rows: 4,
+			alwaysOpenEditWindow: true,
+		},
+		displayOptions: {
+			show: {
+				resource: ['block'],
+				operation: ['append'],
+				blocksInputType: ['expression'],
+			},
+		},
+		default: [],
+		description:
+			'Expression that returns an array of Notion block objects. Must match Notion API block format. For example:\n[{\n  "type": "paragraph",\n  "paragraph": {\n    "rich_text": [{\n      "type": "text",\n      "text": { "content": "Hello world" }\n    }]\n  }\n}]',
+	},
+	...blocks('page', 'create').map((block) => ({
+		...block,
+		displayOptions: {
+			show: {
+				...block.displayOptions?.show,
+				blocksInputType: ['manual'],
+			},
+		},
+	})),
 	{
 		displayName: 'Options',
 		name: 'options',
