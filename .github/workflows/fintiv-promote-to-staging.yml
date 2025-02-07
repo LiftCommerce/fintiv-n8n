@@ -1,0 +1,148 @@
+name: Promote to Staging
+
+on:
+  workflow_dispatch:  # No inputs needed - will use the selected tag
+
+env:
+  AWS_REGION: us-west-2
+  ECR_REGISTRY: ${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.us-west-2.amazonaws.com
+  REPOSITORY: n8n-custom
+  STAGING_KUSTOMIZATION: infrastructure-gitops/kubernetes/overlays/argocd/staging/kustomization.yaml
+  LOCAL_KUSTOMIZATION: infrastructure-gitops/kubernetes/overlays/argocdlocal/local/kustomization.yaml
+  LOCAL_APP: infrastructure-gitops/argocd/applications/environments/local/fintiv-mono-repo-local.yaml
+  LOCAL_BOOTSTRAP: infrastructure-gitops/argocd/bootstrap/local/bootstrap.yaml
+  STAGING_APP: infrastructure-gitops/argocd/applications/environments/staging/fintiv-mono-repo-staging.yaml
+  STAGING_BOOTSTRAP: infrastructure-gitops/argocd/bootstrap/staging/bootstrap.yaml
+
+permissions:
+  contents: write
+  id-token: write
+  pull-requests: write
+  actions: write
+
+jobs:
+  promote:
+    runs-on: ubuntu-latest
+    environment: staging
+    
+    steps:
+      - name: Validate ref type
+        run: |
+          if [ "${{ github.ref_type }}" != "tag" ]; then
+            echo "Error: This workflow can only be triggered by tags, not branches"
+            exit 1
+          fi
+
+      - name: Checkout n8n code
+        uses: actions/checkout@v3
+        with:
+          fetch-depth: 0
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Checkout mono-repo
+        uses: actions/checkout@v3
+        with:
+          repository: LiftCommerce/fintiv-mono-repo
+          path: mono-repo
+          token: ${{ secrets.GITHUB_TOKEN }}
+          fetch-depth: 0
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v2
+        with:
+          role-to-assume: arn:aws:iam::${{ secrets.AWS_ACCOUNT_ID }}:role/github-actions-ecr
+          aws-region: ${{ env.AWS_REGION }}
+      
+      - name: Login to Amazon ECR
+        id: login-ecr
+        uses: aws-actions/amazon-ecr-login@v1
+
+      - name: Create staging branch
+        run: |
+          cd mono-repo
+          git checkout -b staging-${{ github.ref_name }}
+          git config --global user.email "github-actions[bot]@users.noreply.github.com"
+          git config --global user.name "github-actions[bot]"
+
+      - name: Update images in Kustomization
+        run: |
+          cd mono-repo
+          
+          # Update local environment
+          sed -i "s/\${AWS_ACCOUNT_ID}/${{ secrets.AWS_ACCOUNT_ID }}/g" $LOCAL_KUSTOMIZATION
+          
+          # Check if image exists
+          IMAGE_EXISTS=$(aws ecr describe-images \
+            --repository-name ${{ env.REPOSITORY }} \
+            --image-ids imageTag=${{ github.ref_name }} \
+            2>/dev/null || echo "false")
+          
+          if [ "$IMAGE_EXISTS" = "false" ]; then
+            echo "Error: Image ${{ env.REPOSITORY }}:${{ github.ref_name }} not found"
+            exit 1
+          fi
+
+          # Update image tags
+          yq eval "(.images[] | select(.name == \"${{ env.REPOSITORY }}\")).newTag = \"${{ github.ref_name }}\"" -i $LOCAL_KUSTOMIZATION
+          
+          # Update staging environment
+          sed -i "s/\${AWS_ACCOUNT_ID}/${{ secrets.AWS_ACCOUNT_ID }}/g" $STAGING_KUSTOMIZATION
+          yq eval "(.images[] | select(.name == \"${{ env.REPOSITORY }}\")).newTag = \"${{ github.ref_name }}\"" -i $STAGING_KUSTOMIZATION
+
+          # Calculate staging revision
+          STAGING_REVISION=$(echo "${{ github.ref_name }}" | sed 's/-rc//')-staging
+
+          # Update ArgoCD revisions
+          yq eval "(select(.kind == \"Application\").spec.source.targetRevision = \"$STAGING_REVISION\") // ." -i $LOCAL_APP
+          yq eval "(select(.kind == \"Application\").spec.source.targetRevision = \"$STAGING_REVISION\") // ." -i $LOCAL_BOOTSTRAP
+          yq eval "(select(.kind == \"Application\").spec.source.targetRevision = \"$STAGING_REVISION\") // ." -i $STAGING_APP
+          yq eval "(select(.kind == \"Application\").spec.source.targetRevision = \"$STAGING_REVISION\") // ." -i $STAGING_BOOTSTRAP
+          
+          # Commit changes if any
+          if git diff --quiet; then
+            echo "No changes to commit"
+            exit 0
+          fi
+          
+          # Add all changes
+          git add $LOCAL_APP
+          git add $LOCAL_KUSTOMIZATION
+          git add $LOCAL_BOOTSTRAP
+          git add $STAGING_KUSTOMIZATION
+          git add $STAGING_APP
+          git add $STAGING_BOOTSTRAP
+
+          git commit -m "chore: update local and staging deployments to ${{ github.ref_name }}"
+          git push -u origin staging-${{ github.ref_name }}
+
+      - name: Verify Kustomization Updates
+        run: |
+          cd mono-repo
+          echo "Final kustomization.yaml contents:"
+          cat $STAGING_KUSTOMIZATION
+          
+          INCORRECT_TAGS=$(yq eval '.images[].newTag' $STAGING_KUSTOMIZATION | grep -v "^${{ github.ref_name }}$" || true)
+          if [ -n "$INCORRECT_TAGS" ]; then
+            echo "Warning: Some images were not updated:"
+            echo "$INCORRECT_TAGS"
+          else
+            echo "All images successfully updated to version ${{ github.ref_name }}"
+          fi
+
+      - name: Create staging tag in mono-repo
+        if: success()
+        run: |
+          cd mono-repo
+          # Remove "-rc" from the tag name
+          NEW_TAG=$(echo "${{ github.ref_name }}" | sed 's/-rc//')-staging
+          git tag $NEW_TAG
+          git push origin $NEW_TAG
+          echo "Created and pushed new tag: $NEW_TAG"
+
+      - name: Create staging tag in n8n repo
+        if: success()
+        run: |
+          NEW_TAG=$(echo "${{ github.ref_name }}" | sed 's/-rc//')-staging
+          git tag $NEW_TAG
+          git push origin $NEW_TAG
+          echo "Created and pushed new tag: $NEW_TAG"
