@@ -62,13 +62,12 @@ export class NotionV2 implements INodeType {
 			if (operation === 'append') {
 				for (let i = 0; i < itemsLength; i++) {
 					try {
-						const blockId = extractBlockId.call(this, nodeVersion, i);
+						let blockId = extractBlockId.call(this, nodeVersion, i);
 						const inputType = this.getNodeParameter('blocksInputType', i);
-						const body: IDataObject = { children: [] };
+						let blocks: IDataObject[];
 
 						if (inputType === 'expression') {
-							const children = this.getNodeParameter('blocksExpression', i, []) as IDataObject[];
-							body.children = children;
+							blocks = this.getNodeParameter('blocksExpression', i, []) as IDataObject[];
 						} else {
 							const blockValues = this.getNodeParameter(
 								'blockUi.blockValues',
@@ -76,18 +75,38 @@ export class NotionV2 implements INodeType {
 								[],
 							) as IDataObject[];
 							extractDatabaseMentionRLC(blockValues);
-							body.children = formatBlocks(blockValues);
+							blocks = formatBlocks(blockValues);
 						}
 
-						const block = await notionApiRequest.call(
-							this,
-							'PATCH',
-							`/blocks/${blockId}/children`,
-							body,
-						);
+						const chunkSize = 100;
+						const chunks: IDataObject[][] = [];
+
+						if (blocks.length <= chunkSize) {
+							chunks.push(blocks);
+						} else {
+							for (let i = 0; i < blocks.length; i += chunkSize) {
+								const chunk = blocks.slice(i, i + chunkSize);
+								chunks.push(chunk);
+							}
+						}
+
+						const responseBlocks: any[] = [];
+
+						for (const children of chunks) {
+							const body: IDataObject = { children };
+
+							const block = await notionApiRequest.call(
+								this,
+								'PATCH',
+								`/blocks/${blockId}/children`,
+								body,
+							);
+
+							responseBlocks.push(block);
+						}
 
 						const executionData = this.helpers.constructExecutionMetaData(
-							this.helpers.returnJsonArray(block as IDataObject),
+							this.helpers.returnJsonArray(responseBlocks as IDataObject[]),
 							{ itemData: { item: i } },
 						);
 						returnData = returnData.concat(executionData);
@@ -675,13 +694,21 @@ export class NotionV2 implements INodeType {
 						};
 						body.parent.page_id = getPageId.call(this, i);
 						body.properties = formatTitle(this.getNodeParameter('title', i) as string);
-						const blockValues = this.getNodeParameter(
-							'blockUi.blockValues',
-							i,
-							[],
-						) as IDataObject[];
-						extractDatabaseMentionRLC(blockValues);
-						body.children = formatBlocks(blockValues);
+
+						const inputType = this.getNodeParameter('blocksInputType', i);
+
+						if (inputType === 'expression') {
+							const children = this.getNodeParameter('blocksExpression', i, []) as IDataObject[];
+							body.children = children;
+						} else {
+							const blockValues = this.getNodeParameter(
+								'blockUi.blockValues',
+								i,
+								[],
+							) as IDataObject[];
+							extractDatabaseMentionRLC(blockValues);
+							body.children = formatBlocks(blockValues);
+						}
 
 						const options = this.getNodeParameter('options', i);
 						if (options.icon) {
